@@ -3,10 +3,13 @@
 AI产业+营销AI 每日新闻简报
 每天采集昨日新闻，通过 DeepSeek 分类摘要，推送到微信
 
-分类四象限：
-  🏠 国内·AI产业  │  🌍 国际·AI产业
+分类四象限（国内优先展示）：
+  🏠 国内·AI产业  │  🏠 国内·营销AI
   ────────────────┼────────────────
-  🏠 国内·营销AI  │  🌍 国际·营销AI
+  🌍 国际·AI产业  │  🌍 国际·营销AI
+
+重要性分级：S(重大里程碑) > A(重要动态) > B(值得关注) > C(可选阅读)
+配额制：S级无条件保留，A/B级按象限配额填充
 
 使用方式：
   python daily_ai_briefing.py          # 采集昨天新闻
@@ -51,27 +54,38 @@ SERVERCHAN_SENDKEY = os.getenv("SERVERCHAN_SENDKEY", "")
 
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
 
-MAX_NEWS_PER_QUADRANT = 5
-MAX_TOTAL_NEWS = 16
-
 CACHE_DIR = Path(__file__).parent / ".briefing_cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
+# 各象限配额: (最小条数, 最大条数)
+QUOTA_CONFIG = {
+    "domestic_ai":           (3, 5),
+    "domestic_marketing":    (2, 4),
+    "international_ai":      (3, 5),
+    "international_marketing": (2, 4),
+}
+
 # ============================================================
-# RSS 订阅源
+# RSS 订阅源（按象限分组）
 # ============================================================
 
 RSS_FEEDS = {
-    # --- AI产业 国际 ---
+    # ===== 国内 · AI产业 =====
+    "量子位":   "https://www.qbitai.com/feed",
+    "机器之心": "https://www.jiqizhixin.com/rss",
+
+    # ===== 国内 · 营销AI / 科技 =====
+    "36氪 AI":  "https://36kr.com/feed?tagId=人工智能",
+
+    # ===== 国际 · AI产业 =====
     "TechCrunch AI": "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "The Verge AI":   "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
     "MIT Tech Review": "https://www.technologyreview.com/feed/",
-    # --- AI产业 国内 ---
-    "量子位": "https://www.qbitai.com/feed",
-    # --- 营销AI 国际（专注AI+Marketing） ---
-    "Adweek AI": "https://www.adweek.com/category/artificial-intelligence/feed/",
-    "SearchEngineJournal": "https://www.searchenginejournal.com/feed/",
-    # --- 营销AI/科技 国内 ---
-    "36氪 AI": "https://36kr.com/feed?tagId=人工智能",
+
+    # ===== 国际 · 营销AI =====
+    "Adweek AI":              "https://www.adweek.com/category/artificial-intelligence/feed/",
+    "Marketing AI Institute": "https://marketingaiinstitute.com/feed/",
+    "SearchEngineJournal":    "https://www.searchenginejournal.com/feed/",
 }
 
 # ============================================================
@@ -79,7 +93,6 @@ RSS_FEEDS = {
 # ============================================================
 
 def load_sent_cache() -> set:
-    """加载已发送新闻的 URL hash，避免重复推送"""
     cache_file = CACHE_DIR / "sent_hashes.json"
     if cache_file.exists():
         try:
@@ -92,7 +105,6 @@ def load_sent_cache() -> set:
 def save_sent_cache(hashes: set):
     cache_file = CACHE_DIR / "sent_hashes.json"
     cache_file.write_text(json.dumps(list(hashes)))
-    # 清理15天前的记录，防止无限增长
     if len(hashes) > 5000:
         keep = list(hashes)[-3000:]
         cache_file.write_text(json.dumps(keep))
@@ -103,7 +115,6 @@ def url_hash(url: str) -> str:
 
 
 def parse_published(entry) -> Optional[datetime]:
-    """解析 RSS entry 的发布时间"""
     for attr in ("published_parsed", "updated_parsed"):
         tp = getattr(entry, attr, None)
         if tp:
@@ -123,7 +134,6 @@ def date_str(dt: datetime) -> str:
 # ============================================================
 
 def fetch_rss_news(target_date: datetime) -> list[dict]:
-    """从所有 RSS 源采集指定日期的新闻"""
     all_entries = []
     target_str = date_str(target_date)
 
@@ -159,7 +169,6 @@ def fetch_rss_news(target_date: datetime) -> list[dict]:
 
 
 def deduplicate_news(entries: list[dict], sent_cache: set) -> list[dict]:
-    """去重：按 URL hash 去重 + 排除已发送"""
     seen = set()
     unique = []
     for e in entries:
@@ -172,23 +181,129 @@ def deduplicate_news(entries: list[dict], sent_cache: set) -> list[dict]:
 
 
 # ============================================================
-# DeepSeek 分类 + 摘要
+# DeepSeek 分类 + 摘要 + 分级
 # ============================================================
 
+CLASSIFY_PROMPT = """你是一位资深的AI产业+营销AI信息筛选专家。请对以下新闻列表执行四步分析。
+
+═══════════════════════════════════════
+第一步：AI相关性过滤（严格）
+═══════════════════════════════════════
+
+只有当新闻核心主题直接涉及以下领域时才保留，否则标记为 skip：
+
+【必须保留 — AI相关】
+• 基础技术: ML/DL/NLP/CV/语音/神经网络/强化学习/知识图谱
+• 大模型与生成式AI: LLM/GPT/Claude/Gemini/DeepSeek/通义千问/文心一言/Kimi/豆包/Mistral/Llama/
+  多模态(AIGC)/Sora/Midjourney/DALL-E/Suno/Prompt工程/RAG/Function Calling/Agent
+• 产品与应用: AI Agent/Copilot/数字人/具身智能/自动驾驶/机器人/端侧AI/
+  AI编程(Cursor/Devin)/AI搜索(Perplexity)/AI办公/AI客服/智能推荐
+• 基础设施: GPU/TPU/NPU/推理芯片/向量数据库/MLOps/数据标注/合成数据/云计算AI
+• 安全与治理: Safety/Alignment/Ethics/Regulation/Deepfake检测/隐私保护
+• 商业化: SaaS/API服务/融资并购估值/开源项目/半导体
+
+【营销AI专项保留】（同时满足"AI相关"+"营销场景"）
+✅ AI广告投放优化 / AI内容生成(文案/图片/视频) / AI SEO / AI客户数据分析 /
+   AI用户画像 / AI CRM / AI营销自动化 / AI电商推荐 / AI社媒运营工具 /
+   AI客服聊天机器人(营销场景) / 数字人直播带货 / AI销售线索评分
+
+【必须skip】
+❌ 纯品牌联名/新品发布会(即使提到AI功能作为卖点，除非核心就是AI产品)
+❌ 纯硬件评测/电商促销/普通行业资讯(未涉及AI技术应用)
+⚠️ 边界案例原则：宁可多留一条可疑的，不要漏掉一条重要的
+
+═══════════════════════════════════════
+第二步：四象限分类
+═══════════════════════════════════════
+
+• domestic_ai         → 国内·AI产业（中国主体：大模型/芯片/基础设施/政策/融资/研究/开源）
+• domestic_marketing  → 国内·营销AI（中国主体的AI+营销应用，见上方"营销AI专项保留"标准）
+• international_ai    → 国际·AI产业（海外主体，标准同domestic_ai）
+• international_marketing → 国际·营销AI（海外主体的AI+营销应用）
+
+来源辅助参考（非绝对依据，以内容为准）：
+- 国内源: 量子位、机器之心、36氪 → 倾向 domestic_*
+- 国际源: TechCrunch、The Verge → 倾向 international_ai
+- 营销源: Adweek、Marketing AI Institute、SEJ → 倾向 *_marketing
+- MIT Tech Review → 内容混合，需逐条判断
+
+═══════════════════════════════════════
+第三步：重要性分级（核心！）
+═══════════════════════════════════════
+
+【S级 - 🔥重大里程碑】改变行业格局的事件
+  例: 新旗舰模型发布(GPT-n/Claude-n/国产大模型代际跳跃)、国家层面AI政策法规、
+      超10亿美元并购、算力芯片突破性进展、AGI相关重大宣布
+
+【A级 - 重要动态】头部玩家关键动作
+  例: 主要模型更新/能力提升、头部公司融资>1亿人民币或等值、重要开源项目发布、
+      主要监管动作、大厂AI战略调整、权威评测榜单变化
+
+【B级 - 值得关注】有价值的行业信息
+  例: 中型公司产品发布/功能更新、重要技术论文/研究突破、行业报告关键数据、
+      中型融资(1000万-1亿)、实用工具/框架更新、区域性市场动态
+
+【C级 - 可选阅读】补充性内容
+  例: 观点分析文章、访谈/播客要点、小版本迭代、教程/入门指南、趣味应用展示
+
+═══════════════════════════════════════
+第四步：配额筛选 + 摘要 + 导读
+═══════════════════════════════════════
+
+【配额规则】每个象限按以下优先级选取：
+1. S级：全部保留（不设上限，确保大事不漏）
+2. A级：最多取 3 条（按重要性排序）
+3. B级：在 S+A 总数 < 该象限最小配额时补入，最多 2 条
+4. C级：仅在所有象限 S+A+B 总数 < 12 时才考虑补入
+
+各象限配额：
+  domestic_ai:           min=3, max=5
+  domestic_marketing:    min=2, max=4
+  international_ai:      min=3, max=5
+  international_marketing: min=2, max=4
+
+全局总量控制：如果 S级总数 >= 8，启用"密集模式"——各象限只保留 S级 + A级第1名，
+  并在导读中说明"今日为AI高密度日，已精选最关键的N条"
+
+【摘要要求】
+- 每条保留新闻写中文摘要，30-60字
+- S级新闻摘要开头加 🔥 标记
+- A级新闻突出核心数据和影响
+- B/C级摘要简洁概括即可
+
+【今日导读】80-120字：
+1. 今日最重要的1-2条S级事件（如果有）
+2. 各象限新闻分布情况
+3. 一句话趋势判断
+
+═══════════════════════════════════════
+输出格式（严格JSON，不要markdown代码块）
+═══════════════════════════════════════
+{{
+  "overview": "今日导读...",
+  "mode": "normal",
+  "domestic_ai": [
+    {{"id": 0, "level": "S", "summary_cn": "🔥 摘要..."}}
+  ],
+  "domestic_marketing": [...],
+  "international_ai": [...],
+  "international_marketing": [...]
+}}
+
+注意：id对应输入新闻列表下标；level必须是S/A/B/C之一；skip的不出现。
+
+═══════════════════════════════════════
+新闻列表（共 N 条）
+═══════════════════════════════════════
+{news_json}
+
+请输出JSON："""
+
+
 def classify_and_summarize(news_list: list[dict]) -> dict:
-    """
-    用 DeepSeek 对新闻进行四象限分类并生成中文摘要。
-    返回:
-    {
-        "overview": "今日导读",
-        "domestic_ai": [{title, url, source, summary}],
-        "domestic_marketing": [...],
-        "international_ai": [...],
-        "international_marketing": [...],
-    }
-    """
     if not news_list:
-        return {"overview": "今日无相关新闻。", "domestic_ai": [], "domestic_marketing": [],
+        return {"overview": "今日无相关新闻。", "mode": "normal",
+                "domestic_ai": [], "domestic_marketing": [],
                 "international_ai": [], "international_marketing": []}
 
     client = OpenAI(api_key=DEEPSEEK_API_KEY, base_url=DEEPSEEK_BASE_URL)
@@ -199,94 +314,13 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
         ensure_ascii=False,
     )
 
-    prompt = f"""你是一位专业的AI产业分析师。请分析以下新闻列表，完成三个任务。
-
-## ⚠️ 核心原则：本简报只收录与AI技术直接相关的新闻
-- 如果一条新闻是关于营销/广告/品牌活动/产品发布，但完全没有提到AI、机器学习、大模型、自动化、智能推荐等技术，则该新闻不属于本简报范围
-
-## 任务1：四象限分类 + 严格过滤
-对每条新闻做两步判断：
-
-第一步：是否与AI直接相关？
-采用开放式判断标准——只要新闻核心主题涉及以下任何一个领域，就算与AI相关：
-
-【AI基础技术】机器学习、深度学习、NLP自然语言处理、CV计算机视觉、语音识别/合成、神经网络、强化学习、知识图谱
-
-【大模型与生成式AI】LLM/GPT/Claude/Gemini/DeepSeek/通义千问/文心一言/Kimi/豆包/Mistral/Llama、多模态模型（文本/图像/音频/视频生成）、Sora/Midjourney/DALL-E/Suno等生成工具、AIGC内容生成、Prompt提示工程、Chain-of-Thought思维链、RAG检索增强生成、Function Calling函数调用、Tool Use工具调用、Long Context长上下文
-
-【AI应用形态】AI Agent智能体/自主代理、Copilot助手类产品、数字人/虚拟人/Avatar、具身智能Embodied AI、自动驾驶Autonomous Driving、机器人Robotics、端侧AI/Edge AI/On-device AI、AI编程Cursor/Devin/Windsurf、AI搜索Perplexity/SearchGPT、AI办公Notion AI/Gamma、AI客服/聊天机器人、智能推荐系统
-
-【AI基础设施】算力Compute/GPU/TPU/NPU、推理芯片、向量数据库Vector DB、MLOps/LLMOps、数据标注Data Labeling、合成数据Synthetic Data、云计算AI服务、API平台即服务
-
-【AI安全与治理】AI Safety、AI Alignment对齐、AI Ethics伦理、AI Regulation法规、Deepfake检测、内容审核AI、隐私保护
-
-【AI商业化】AI SaaS产品、AI API服务、AI融资/并购/估值、AI开源项目、AI芯片/半导体
-
-如果新闻完全与上述领域无关 → 归入 skip
-
-第二步：如果与AI相关，分入四个象限之一：
-
-- domestic_ai: 国内AI产业（中国公司/机构的AI技术研发：大模型发布/升级、AI芯片、AI基础设施、AI政策法规、AI融资、AI开源项目、AI研究突破）
-- international_ai: 国际AI产业（海外公司/机构的AI技术研发：同上标准）
-
-- domestic_marketing: 国内营销AI（严格定义！必须同时满足以下条件）
-  ✅ 算：AI广告投放优化/AI内容生成工具/AI文案写作/AI SEO/AI客户数据分析/AI用户画像/AI CRM/AI营销自动化平台/AI电商推荐引擎/AI社交媒体运营工具
-  ❌ 不算：手机/汽车/家电等产品发布会（即使宣传中提到"AI功能"）、硬件产品评测、品牌联名活动、普通电商促销活动
-
-- international_marketing: 国际营销AI（同上严格标准，针对海外市场）
-
-判断示例（涵盖各类AI场景）：
-- "纪梵希推出联名早餐" → skip（与AI无关）
-- "OPPO Reno16发布，主打AI智慧体验" → domestic_ai（消费电子产品带AI功能）
-- "OpenAI发布GPT-5" → international_ai
-- "DeepSeek-R1推理模型登顶排行榜" → international_ai
-- "Sora 2.0支持生成2分钟视频" → international_ai（AIGC/多模态）
-- "Midjourney v7发布" → international_ai（图像AIGC工具）
-- "Cursor用AI帮程序员写代码效率翻倍" → international_ai（AI编程工具）
-- "Perplexity挑战Google搜索" → international_ai（AI搜索产品）
-- "人形机器人Figure 2发布" → international_ai（具身智能/机器人）
-- "英伟达发布B200芯片" → international_ai（AI芯片/算力）
-- "PPIO入选全球AI100" → domestic_ai
-- "比亚迪自研4nm AI芯片" → domestic_ai
-- "苹果WWDC展示端侧AI能力" → international_ai
-- "百度用大模型优化搜索广告CTR提升40%" → domestic_marketing（AI用于广告投放）
-- "Salesforce推出Einstein GPT for Marketing Cloud" → international_marketing（AI营销SaaS平台）
-- "Google AI Overview改变SEO策略" → international_marketing（AI影响搜索营销）
-- "Jasper AI融资5000万，帮助企业批量生成营销文案" → international_marketing（AI文案生成=营销AI）
-- "阿里妈妈推出万相台AI创意工具" → domestic_marketing（AI广告创意=营销AI）
-- "字节跳动用AI大模型做短视频推荐" → domestic_marketing（AI推荐算法=营销AI）
-- "数字人直播带货月销破千万" → domestic_marketing（数字人=AI营销应用）
-- "某品牌用AI客服替代80%人工客服" → domestic_marketing（AI客服=营销AI应用）
-
-## 任务2：生成中文摘要
-为每条保留的新闻写一个简洁的中文摘要（30-60字），突出核心信息。
-
-## 任务3：生成今日导读
-写一段80-120字的"今日导读"，概括今日新闻的整体趋势和亮点。
-
-## 输出格式（严格JSON，不要markdown代码块）：
-{{
-  "overview": "今日导读文字...",
-  "domestic_ai": [
-    {{"id": 0, "summary_cn": "中文摘要"}}
-  ],
-  "domestic_marketing": [...],
-  "international_ai": [...],
-  "international_marketing": [...]
-}}
-
-## 新闻列表：
-{news_json}
-
-请输出JSON："""
-
     try:
         log.info("  调用 DeepSeek 进行分类和摘要...")
         resp = client.chat.completions.create(
             model=DEEPSEEK_MODEL,
             messages=[
                 {"role": "system", "content": "你是专业的AI产业分析师。请严格按JSON格式输出，不要添加markdown代码块标记。"},
-                {"role": "user", "content": prompt},
+                {"role": "user", "content": CLASSIFY_PROMPT.format(news_json=news_json)},
             ],
             temperature=0.3,
             max_tokens=4096,
@@ -309,12 +343,12 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
 
 
 def fallback_classify(news_list: list[dict]) -> dict:
-    """当 DeepSeek 失败时，按来源做简易分类"""
-    cn_sources = {"机器之心", "量子位", "梅花网", "36氪"}
-    marketing_sources = {"Martech.org", "AdExchanger", "SearchEngineJournal", "梅花网"}
+    cn_sources = {"机器之心", "量子位", "36氪"}
+    marketing_sources = {"Adweek AI", "Marketing AI Institute", "SearchEngineJournal"}
 
     result = {
         "overview": f"今日共采集 {len(news_list)} 条AI相关新闻（自动分类模式）。",
+        "mode": "normal",
         "domestic_ai": [], "domestic_marketing": [],
         "international_ai": [], "international_marketing": [],
     }
@@ -322,24 +356,43 @@ def fallback_classify(news_list: list[dict]) -> dict:
         is_cn = n["source"] in cn_sources
         is_mkt = n["source"] in marketing_sources
         key = ("domestic_" if is_cn else "international_") + ("marketing" if is_mkt else "ai")
-        result[key].append({"id": i, "summary_cn": ""})
+        result[key].append({"id": i, "level": "B", "summary_cn": ""})
     return result
 
 
 def merge_results(news_list: list[dict], llm_result: dict) -> dict:
-    """将LLM结果与原始新闻数据合并"""
     id_map = {i: n for i, n in enumerate(news_list)}
 
     def fill(quadrant_key):
+        raw_items = llm_result.get(quadrant_key, [])
         items = []
-        for item in llm_result.get(quadrant_key, [])[:MAX_NEWS_PER_QUADRANT]:
+        for item in raw_items:
             n = id_map.get(item["id"])
             if n:
-                items.append({**n, "summary_cn": item.get("summary_cn", "")})
-        return items
+                items.append({
+                    **n,
+                    "summary_cn": item.get("summary_cn", ""),
+                    "level": item.get("level", "B"),
+                })
+
+        level_order = {"S": 0, "A": 1, "B": 2, "C": 3}
+        items.sort(key=lambda x: level_order.get(x["level"], 9))
+
+        s_items = [x for x in items if x["level"] == "S"]
+        non_s = [x for x in items if x["level"] != "S"]
+        min_q, max_q = QUOTA_CONFIG.get(quadrant_key, (2, 5))
+
+        if len(s_items) <= max_q:
+            remaining = max(0, min_q - len(s_items))
+            result = s_items + non_s[:max(remaining, max_q - len(s_items))]
+        else:
+            result = s_items + non_s[:2]
+
+        return result
 
     return {
         "overview": llm_result.get("overview", ""),
+        "mode": llm_result.get("mode", "normal"),
         "domestic_ai": fill("domestic_ai"),
         "domestic_marketing": fill("domestic_marketing"),
         "international_ai": fill("international_ai"),
@@ -357,13 +410,16 @@ def format_briefing_html(result: dict, target_date: datetime) -> str:
 
     quadrants = [
         ("🏠 国内 · AI产业", "domestic_ai", "#3b82f6"),
-        ("🌍 国际 · AI产业", "international_ai", "#8b5cf6"),
         ("🏠 国内 · 营销AI", "domestic_marketing", "#10b981"),
+        ("🌍 国际 · AI产业", "international_ai", "#8b5cf6"),
         ("🌍 国际 · 营销AI", "international_marketing", "#f59e0b"),
     ]
 
     total = sum(len(result[k]) for k in ["domestic_ai", "domestic_marketing",
                                            "international_ai", "international_marketing"])
+    mode_tag = ""
+    if result.get("mode") == "dense":
+        mode_tag = '<span style="background:#ef4444;color:#fff;font-size:11px;padding:2px 8px;border-radius:4px;margin-left:8px">高密度日</span>'
 
     html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"></head>
@@ -372,7 +428,7 @@ def format_briefing_html(result: dict, target_date: datetime) -> str:
 
 <div style="text-align:center;margin-bottom:20px">
   <div style="font-size:22px;font-weight:700;color:#1a1a2e">📰 AI产业+营销AI 日报</div>
-  <div style="font-size:14px;color:#888;margin-top:4px">📅 {date_label} 周{weekday}</div>
+  <div style="font-size:14px;color:#888;margin-top:4px">📅 {date_label} 周{weekday}{mode_tag}</div>
 </div>
 
 <div style="background:#f0f7ff;border-radius:8px;padding:14px 16px;margin-bottom:20px;border-left:4px solid #3b82f6">
@@ -390,9 +446,21 @@ def format_briefing_html(result: dict, target_date: datetime) -> str:
 
         for i, n in enumerate(items, 1):
             summary = n.get("summary_cn", "")
+            level = n.get("level", "B")
+            is_hot = level == "S"
+
+            if is_hot:
+                bg_color = "#fffbeb"
+                border_l = "#f59e0b"
+                hot_badge = '<span style="background:#ef4444;color:#fff;font-size:11px;padding:1px 6px;border-radius:4px;margin-left:6px">重磅</span>'
+            else:
+                bg_color = "#fafafa"
+                border_l = "#e5e7eb"
+                hot_badge = ""
+
             html += f"""
-  <div style="margin-bottom:12px;padding:12px;background:#fafafa;border-radius:8px">
-    <div style="font-size:14px;font-weight:600;color:#222;line-height:1.5">{i}. {n['title']}</div>"""
+  <div style="margin-bottom:12px;padding:12px;background:{bg_color};border-radius:8px;border-left:3px solid {border_l}">
+    <div style="font-size:14px;font-weight:600;color:#222;line-height:1.5">{i}. {n['title']}{hot_badge}</div>"""
             if summary:
                 html += f"""
     <div style="font-size:13px;color:#555;margin-top:4px;line-height:1.5">📝 {summary}</div>"""
@@ -407,7 +475,7 @@ def format_briefing_html(result: dict, target_date: datetime) -> str:
 
     html += f"""
 <div style="text-align:center;font-size:12px;color:#aaa;margin-top:20px;padding-top:16px;border-top:1px solid #eee">
-📊 共 {total} 条 · DeepSeek 智能摘要 · 每日9:00自动推送
+📊 共 {total} 条 · DeepSeek 智能分级摘要 · 每日9:00自动推送
 </div>
 
 </div></body></html>"""
@@ -416,13 +484,13 @@ def format_briefing_html(result: dict, target_date: datetime) -> str:
 
 
 def format_briefing_text(result: dict, target_date: datetime) -> str:
-    """纯文本版本（终端输出用）"""
     date_label = target_date.strftime("%Y年%m月%d日")
     weekday = ["一", "二", "三", "四", "五", "六", "日"][target_date.weekday()]
+    mode_suffix = " [高密度日]" if result.get("mode") == "dense" else ""
 
     lines = [
         f"📰 AI产业+营销AI 日报",
-        f"📅 {date_label} 周{weekday}",
+        f"📅 {date_label} 周{weekday}{mode_suffix}",
         f"",
         f"━━━ 📊 今日导读 ━━━",
         f"{result['overview']}",
@@ -431,8 +499,8 @@ def format_briefing_text(result: dict, target_date: datetime) -> str:
 
     quadrants = [
         ("🏠 国内 · AI产业", "domestic_ai"),
-        ("🌍 国际 · AI产业", "international_ai"),
         ("🏠 国内 · 营销AI", "domestic_marketing"),
+        ("🌍 国际 · AI产业", "international_ai"),
         ("🌍 国际 · 营销AI", "international_marketing"),
     ]
 
@@ -443,7 +511,9 @@ def format_briefing_text(result: dict, target_date: datetime) -> str:
         lines.append(f"━━━ {section_title} ━━━")
         for i, n in enumerate(items, 1):
             summary = n.get("summary_cn", "")
-            lines.append(f"{i}. {n['title']}")
+            level = n.get("level", "B")
+            level_tag = "🔥 " if level == "S" else ""
+            lines.append(f"{i}. [{level_tag}]{n['title']}".strip())
             if summary:
                 lines.append(f"   📝 {summary}")
             lines.append(f"   🔗 {n['url']}")
@@ -452,7 +522,7 @@ def format_briefing_text(result: dict, target_date: datetime) -> str:
 
     total = sum(len(result[k]) for k in ["domestic_ai", "domestic_marketing",
                                            "international_ai", "international_marketing"])
-    lines.append(f"📊 共 {total} 条 | DeepSeek 摘要 | 每日9:00自动推送")
+    lines.append(f"📊 共 {total} 条 | DeepSeek S/A/B/C分级 | 每日9:00自动推送")
 
     return "\n".join(lines)
 
@@ -462,18 +532,16 @@ def format_briefing_text(result: dict, target_date: datetime) -> str:
 # ============================================================
 
 def push_wechat(html_content: str, text_content: str) -> bool:
-    """推送简报到微信：优先 PushPlus HTML，fallback Server酱纯文本"""
     if PUSHPLUS_TOKEN:
         return _push_pushplus(html_content)
     if SERVERCHAN_SENDKEY:
-        log.warning("  PushPlus 未配置，降级使用 Server酱（排版可能不佳）")
+        log.warning("  PushPlus 未配置，降级使用 Server酱")
         return _push_serverchan(text_content)
-    log.warning("  未配置 PUSHPLUS_TOKEN 或 SERVERCHAN_SENDKEY，跳过推送")
+    log.warning("  未配置推送Token，跳过推送")
     return False
 
 
 def _push_pushplus(html_content: str) -> bool:
-    """PushPlus 推送（HTML 格式，排版精美）"""
     try:
         resp = requests.post(
             "https://www.pushplus.plus/send",
@@ -498,7 +566,6 @@ def _push_pushplus(html_content: str) -> bool:
 
 
 def _push_serverchan(text_content: str) -> bool:
-    """Server酱 推送（纯文本，备用方案）"""
     max_len = 2000
     chunks = []
     current = ""
@@ -533,7 +600,6 @@ def _push_serverchan(text_content: str) -> bool:
 
 
 def save_local_copy(content: str, target_date: datetime):
-    """保存本地备份"""
     backup_dir = CACHE_DIR / "history"
     backup_dir.mkdir(exist_ok=True)
     filename = backup_dir / f"briefing_{date_str(target_date)}.txt"
@@ -562,7 +628,6 @@ def main():
 
     log.info(f"目标日期: {date_str(target_date)} (过去{args.days}天)")
 
-    # Step 1: 采集新闻
     log.info("=" * 50)
     log.info("Step 1/5: 采集RSS新闻...")
     all_news = []
@@ -571,7 +636,6 @@ def main():
         all_news.extend(fetch_rss_news(day))
     log.info(f"  采集到 {len(all_news)} 条原始新闻")
 
-    # Step 2: 去重
     log.info("Step 2/5: 去重...")
     sent_cache = load_sent_cache()
     unique_news = deduplicate_news(all_news, sent_cache)
@@ -581,22 +645,23 @@ def main():
         log.warning("  无新增新闻，退出")
         return
 
-    # 限制总数，避免 token 超限
     if len(unique_news) > 40:
         unique_news = unique_news[:40]
 
-    # Step 3: DeepSeek 分类+摘要
-    log.info("Step 3/5: DeepSeek 分类+摘要...")
+    log.info("Step 3/5: DeepSeek 分类+分级+摘要...")
     result = classify_and_summarize(unique_news)
     total_classified = sum(len(result[k]) for k in
                            ["domestic_ai", "domestic_marketing",
                             "international_ai", "international_marketing"])
-    log.info(f"  分类完成: 国内AI={len(result['domestic_ai'])}条, "
-             f"国内营销={len(result['domestic_marketing'])}条, "
-             f"国际AI={len(result['international_ai'])}条, "
-             f"国际营销={len(result['international_marketing'])}条")
 
-    # Step 4: 格式化
+    s_count = sum(1 for k in ["domestic_ai","domestic_marketing","international_ai","international_marketing"]
+                  for n in result[k] if n.get("level")=="S")
+    log.info(f"  分类完成: 总{total_classified}条 (S级{s_count}条), "
+             f"国内AI={len(result['domestic_ai'])}, "
+             f"国内营销={len(result['domestic_marketing'])}, "
+             f"国际AI={len(result['international_ai'])}, "
+             f"国际营销={len(result['international_marketing'])}")
+
     log.info("Step 4/5: 格式化简报...")
     html_content = format_briefing_html(result, target_date)
     text_content = format_briefing_text(result, target_date)
@@ -606,12 +671,10 @@ def main():
         print("\n" + "=" * 50)
         print(text_content)
 
-    # Step 5: 推送
     if not args.dry_run:
         log.info("Step 5/5: 推送到微信...")
         push_wechat(html_content, text_content)
 
-        # 记录已发送
         for quadrant in ["domestic_ai", "domestic_marketing",
                          "international_ai", "international_marketing"]:
             for n in result[quadrant]:
