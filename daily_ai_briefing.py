@@ -4,9 +4,9 @@ AI产业+营销AI 每日新闻简报
 每天采集昨日新闻，通过 DeepSeek 分类摘要，推送到微信
 
 分类四象限（国内优先展示）：
-  🏠 国内·AI产业  │  🏠 国内·营销AI
+  🏠 国内·AI产业  │  🏠 国内·AI+营销
   ────────────────┼────────────────
-  🌍 国际·AI产业  │  🌍 国际·营销AI
+  🌍 国际·AI产业  │  🌍 国际·AI+营销
 
 重要性分级：S(重大里程碑) > A(重要动态) > B(值得关注) > C(可选阅读)
 配额制：S级无条件保留，A/B级按象限配额填充
@@ -72,17 +72,37 @@ QUOTA_CONFIG = {
 RSS_FEEDS = {
     # ===== 国内 · AI产业 =====
     "量子位":   "https://www.qbitai.com/feed",
-
-    # ===== 国内 · 营销AI / 科技 =====
     "36氪 AI":  "https://36kr.com/feed?tagId=人工智能",
 
-    # ===== 国际 · AI产业 =====
-    "TechCrunch AI": "https://techcrunch.com/category/artificial-intelligence/feed/",
-    "The Verge AI":   "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
-    "MIT Tech Review": "https://www.technologyreview.com/feed/",
+    # ===== 国内 · 科技综合（AI产业补充源） =====
+    "钛媒体":   "http://www.tmtpost.com/feed",
+    "IT之家":   "http://www.ithome.com/rss/",
+    "爱范儿":   "https://www.ifanr.com/feed",
 
-    # ===== 国际 · 营销AI =====
-    "SearchEngineJournal": "https://www.searchenginejournal.com/feed/",
+    # ===== 国内 · AI+营销（广告/营销垂直媒体） =====
+    "梅花网":                "https://www.meihua.info/feed",
+    "SocialBeta":            "https://socialbeta.com/feed",
+    "广告门":                 "https://www.adquan.com/feed",
+    "36氪营销":               "https://36kr.com/feed?tagId=营销",
+    "人人都是产品经理_AI":    "https://www.woshipm.com/ai/feed",
+    "运营派":                "https://www.yunyingpai.com/feed",
+
+    # ===== 国际 · AI产业 =====
+    "TechCrunch AI":      "https://techcrunch.com/category/artificial-intelligence/feed/",
+    "The Verge AI":        "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+    "MIT Tech Review":     "https://www.technologyreview.com/feed/",
+    "Ars Technica AI":     "https://arstechnica.com/ai/feed/",
+    "VentureBeat AI":      "https://venturebeat.com/category/ai/feed/",
+
+    # ===== 国际 · AI+营销 / MarTech（方案B核心） =====
+    "Marketing AI Institute": "https://www.marketingaiinstitute.com/blog/feed",
+    "MarTech.org":            "https://martech.org/feed/",
+    "Adweek":                 "https://www.adweek.com/feed/",
+    "Marketing Dive":         "https://www.marketingdive.com/feeds/news/",
+    "Search Engine Land":     "https://searchengineland.com/feed/",
+    "SearchEngineJournal":    "https://www.searchenginejournal.com/feed/",
+    "Chiefmartec":            "https://chiefmartec.com/feed/",
+    "The Drum":               "https://www.thedrum.com/feed/",
 }
 
 # ============================================================
@@ -190,10 +210,21 @@ CLASSIFY_PROMPT = """你是一位资深的AI产业+营销AI信息筛选专家。
 【核心原则】宁可多留，不要漏掉！边界模糊一律保留！
 
 来源先验可信度（重要！）：
-- 量子位、机器之心、36氪 是国内 AI/科技垂直媒体，它们发布的新闻默认与 AI 产业相关，
-  除非内容明显是纯非科技类（如纯娱乐、纯体育），否则一律保留。
-- TechCrunch AI、The Verge AI、MIT Tech Review、Adweek、Marketing AI Institute、SEJ
-  均为 AI/科技/营销垂直源，同样适用宽松保留原则。
+- 量子位、36氪AI、钛媒体、IT之家、爱范儿 是国内 AI/科技垂直或综合媒体，它们发布的
+  新闻默认与 AI 产业相关，除非内容明显是纯非科技类（如纯娱乐、纯体育），否则一律保留。
+  ⚠️ 重要：这些AI产业源中也会出现AI+营销内容（如"AIGC素材工具发布""AI投放优化""智能客服
+  营销场景"等），当出现此类内容时，必须交叉分配到 domestic_marketing 象限，不要锁死在AI产业！
+- 梅花网、SocialBeta、广告门 是国内广告/营销垂直媒体，它们的内容以营销案例、品牌动态、
+  行业趋势为主，其中涉及AI+营销的内容需要精准提取。
+- 36氪营销、人人都是产品经理(AI频道)、运营派 是国内产品/运营/营销交叉领域的垂直媒体，
+  它们频繁发布AI工具测评、AI营销案例、AIGC应用等内容，AI+营销相关度约20-40%，
+  请逐条判断是否涉及AI，涉及AI的优先归入 domestic_marketing。
+- TechCrunch AI、The Verge AI、MIT Tech Review、Ars Technica AI、VentureBeat AI
+  均为国际 AI/科技垂直源，同样适用宽松保留原则和交叉识别规则（AI产业源中的营销AI内容
+  交叉分配到 international_marketing）。
+- Marketing AI Institute、MarTech.org、Adweek、Marketing Dive、Search Engine Land、
+  SearchEngineJournal、Chiefmartec、The Drum 均为国际营销/MarTech垂直源，
+  其中 Marketing AI Institute 是AI+营销最权威垂直媒体，其内容99%+涉及AI。
 
 【保留标准 — 满足以下任意一条即保留】
 ✅ 明确涉及 AI/ML/DL/NLP/CV/语音/神经网络/强化学习/知识图谱技术本身
@@ -239,14 +270,24 @@ CLASSIFY_PROMPT = """你是一位资深的AI产业+营销AI信息筛选专家。
 ═══════════════════════════════════════
 
 • domestic_ai         → 国内·AI产业（中国主体：大模型/芯片/基础设施/政策/融资/研究/开源）
-• domestic_marketing  → 国内·营销AI（中国主体的AI+营销应用，见上方"营销AI专项"标准）
+• domestic_marketing  → 国内·AI+营销（中国主体的AI+营销应用，见上方"营销AI专项"标准）
 • international_ai    → 国际·AI产业（海外主体，标准同domestic_ai）
-• international_marketing → 国际·营销AI（海外主体的AI+营销应用）
+• international_marketing → 国际·AI+营销（海外主体的AI+营销应用）
 
 【来源优先判定 — 强信号】
-- 量子位、机器之心、36氪 → 95%+ 概率归入 domestic_* 象限
-- TechCrunch AI、The Verge AI → 倾向 international_ai
-- Adweek、Marketing AI Institute、SEJ → 倾向 international_marketing
+- 量子位、36氪AI、钛媒体、IT之家 → 85%+ 概率归入 domestic_ai 象限，
+  但约15%内容涉及AI+营销应用（如AIGC工具、AI投放、智能客服营销场景），
+  此类内容必须交叉分配到 domestic_marketing
+- 爱范儿 → 内容混合，科技+商业+生活，需逐条判断
+- 梅花网、SocialBeta、广告门 → 80%+ 概率归入 domestic_marketing（国内营销垂直媒体），
+  但需逐条判断是否涉及AI（因为它们是泛营销媒体，不是AI专属）
+- 36氪营销、人人都是产品经理(AI频道)、运营派 → 倾向 domestic_marketing，
+  这些源的内容天然与产品/运营/营销交叉，AI相关内容优先归入营销AI象限
+- TechCrunch AI、The Verge AI、Ars Technica AI、VentureBeat AI → 倾向 international_ai，
+  但需交叉识别其中的营销AI内容归入 international_marketing
+- Marketing AI Institute → 99%+ 概率归入 international_marketing（AI+营销第一垂直源）
+- MarTech.org、Adweek、Marketing Dive、Search Engine Land、SearchEngineJournal、
+  Chiefmartec、The Drum → 85%+ 概率归入 international_marketing
 - MIT Tech Review → 内容混合，需逐条判断
 - 判定逻辑：先看内容主题，再看来源归属；两者冲突时以内容为准，但来源是重要参考依据
 
@@ -366,8 +407,22 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
 
 
 def fallback_classify(news_list: list[dict]) -> dict:
-    cn_sources = {"机器之心", "量子位", "36氪"}
-    marketing_sources = {"Adweek AI", "Marketing AI Institute", "SearchEngineJournal"}
+    cn_ai_sources = {"量子位", "36氪 AI", "钛媒体", "IT之家", "爱范儿"}
+    cn_marketing_sources = {"梅花网", "SocialBeta", "广告门", "36氪营销",
+                            "人人都是产品经理_AI", "运营派"}
+    intl_ai_sources = {"TechCrunch AI", "The Verge AI", "MIT Tech Review",
+                       "Ars Technica AI", "VentureBeat AI"}
+    intl_marketing_sources = {"Marketing AI Institute", "MarTech.org", "Adweek",
+                              "Marketing Dive", "Search Engine Land",
+                              "SearchEngineJournal", "Chiefmartec", "The Drum"}
+
+    # 营销场景关键词（用于从AI产业源中交叉识别）
+    marketing_keywords = [
+        "广告", "投放", "SEO", "文案", "内容生成", "AIGC素材", "AIGC工具",
+        "营销自动化", "CRM", "客户数据", "用户画像", "推荐算法", "直播带货",
+        "销售线索", "转化率", "舆情", "竞品", "社媒运营",
+        "marketing", "advertising", "MarTech", "DSP", "SSP", "CDP", "DAM",
+    ]
 
     result = {
         "overview": f"今日共采集 {len(news_list)} 条AI相关新闻（自动分类模式）。",
@@ -376,9 +431,31 @@ def fallback_classify(news_list: list[dict]) -> dict:
         "international_ai": [], "international_marketing": [],
     }
     for i, n in enumerate(news_list):
-        is_cn = n["source"] in cn_sources
-        is_mkt = n["source"] in marketing_sources
-        key = ("domestic_" if is_cn else "international_") + ("marketing" if is_mkt else "ai")
+        src = n["source"]
+        title = n.get("title", "")
+
+        if src in cn_marketing_sources:
+            key = "domestic_marketing"
+        elif src in cn_ai_sources:
+            # AI产业源中出现营销关键词 → 交叉识别为营销AI
+            if any(kw in title for kw in marketing_keywords):
+                key = "domestic_marketing"
+            else:
+                key = "domestic_ai"
+        elif src in intl_marketing_sources:
+            key = "international_marketing"
+        elif src in intl_ai_sources:
+            # 国际AI产业源中出现营销关键词 → 交叉识别
+            if any(kw.lower() in title.lower() for kw in marketing_keywords):
+                key = "international_marketing"
+            else:
+                key = "international_ai"
+        else:
+            title_lower = title.lower()
+            if any(kw in title_lower for kw in ["广告", "投放", "营销", "seo", "advertising", "marketing"]):
+                key = "international_marketing"
+            else:
+                key = "international_ai"
         result[key].append({"id": i, "level": "B", "summary_cn": ""})
     return result
 
@@ -492,9 +569,9 @@ def format_briefing_html(result: dict, target_date: datetime) -> str:
 
     quadrants = [
         ("🏠 国内 · AI产业", "domestic_ai", "#3b82f6"),
-        ("🏠 国内 · 营销AI", "domestic_marketing", "#10b981"),
+        ("🏠 国内 · AI+营销", "domestic_marketing", "#10b981"),
         ("🌍 国际 · AI产业", "international_ai", "#8b5cf6"),
-        ("🌍 国际 · 营销AI", "international_marketing", "#f59e0b"),
+        ("🌍 国际 · AI+营销", "international_marketing", "#f59e0b"),
     ]
 
     total = sum(len(result[k]) for k in ["domestic_ai", "domestic_marketing",
@@ -581,9 +658,9 @@ def format_briefing_text(result: dict, target_date: datetime) -> str:
 
     quadrants = [
         ("🏠 国内 · AI产业", "domestic_ai"),
-        ("🏠 国内 · 营销AI", "domestic_marketing"),
+        ("🏠 国内 · AI+营销", "domestic_marketing"),
         ("🌍 国际 · AI产业", "international_ai"),
-        ("🌍 国际 · 营销AI", "international_marketing"),
+        ("🌍 国际 · AI+营销", "international_marketing"),
     ]
 
     for section_title, key in quadrants:
