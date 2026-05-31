@@ -64,19 +64,13 @@ CACHE_DIR.mkdir(exist_ok=True)
 RSS_FEEDS = {
     # --- AI产业 国际 ---
     "TechCrunch AI": "https://techcrunch.com/category/artificial-intelligence/feed/",
-    "VentureBeat AI": "https://venturebeat.com/category/ai/feed/",
     "MIT Tech Review": "https://www.technologyreview.com/feed/",
-    "ArXiv AI": "https://rss.arxiv.org/rss/cs.AI",
     # --- AI产业 国内 ---
-    "机器之心": "https://www.jiqizhixin.com/rss",
     "量子位": "https://www.qbitai.com/feed",
     # --- 营销AI 国际（专注AI+Marketing） ---
-    "Marketing AI Institute": "https://marketingaiinstitute.com/feed/",
     "Adweek AI": "https://www.adweek.com/category/artificial-intelligence/feed/",
     "SearchEngineJournal": "https://www.searchenginejournal.com/feed/",
-    "Martech.org": "https://martech.org/feed/",
-    "The Drum Marketing AI": "https://www.thedrum.com/category/ai/rss.xml",
-    # --- 营销AI 国内（专注AI+营销） ---
+    # --- 营销AI/科技 国内 ---
     "36氪 AI": "https://36kr.com/feed?tagId=人工智能",
 }
 
