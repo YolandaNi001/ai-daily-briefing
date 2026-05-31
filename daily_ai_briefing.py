@@ -70,12 +70,14 @@ RSS_FEEDS = {
     # --- AI产业 国内 ---
     "机器之心": "https://www.jiqizhixin.com/rss",
     "量子位": "https://www.qbitai.com/feed",
-    # --- 营销AI 国际 ---
-    "Martech.org": "https://martech.org/feed/",
-    "AdExchanger": "https://www.adexchanger.com/feed/",
+    # --- 营销AI 国际（专注AI+Marketing） ---
+    "Marketing AI Institute": "https://marketingaiinstitute.com/feed/",
+    "Adweek AI": "https://www.adweek.com/category/artificial-intelligence/feed/",
     "SearchEngineJournal": "https://www.searchenginejournal.com/feed/",
-    # --- 营销AI 国内 ---
-    "梅花网": "https://www.meihua.info/feed",
+    "Martech.org": "https://martech.org/feed/",
+    "The Drum Marketing AI": "https://www.thedrum.com/category/ai/rss.xml",
+    # --- 营销AI 国内（专注AI+营销） ---
+    "36氪 AI": "https://36kr.com/feed?tagId=人工智能",
 }
 
 # ============================================================
@@ -203,24 +205,32 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
         ensure_ascii=False,
     )
 
-    prompt = f"""你是一位专业的AI产业分析师。请分析以下新闻列表，完成三个任务：
+    prompt = f"""你是一位专业的AI产业分析师。请分析以下新闻列表，完成三个任务。
 
-## 任务1：四象限分类
-将每条新闻分入以下四个类别之一：
-- domestic_ai: 国内AI产业（中国公司/机构的AI技术、大模型、芯片、政策等）
-- domestic_marketing: 国内营销AI（中国市场的AI营销、广告、内容生成应用）
-- international_ai: 国际AI产业（海外公司/机构的AI技术、大模型、芯片、政策等）
-- international_marketing: 国际营销AI（海外市场的AI营销、广告、内容生成应用）
+## ⚠️ 核心原则：本简报只收录与AI技术直接相关的新闻
+- 如果一条新闻是关于营销/广告/品牌活动，但完全没有提到AI、机器学习、大模型、自动化、智能推荐等技术，则该新闻不属于本简报范围
+- "营销AI"类别 = AI技术在营销领域的应用，不是所有营销新闻都算
 
-分类规则：
-- 涉及中国公司/市场/政策的 → 国内(domestic)
-- 涉及海外公司/市场/政策的 → 国际(international)
-- 涉及大模型、芯片、AI基础设施、AI政策、AI融资、技术突破 → AI产业(ai)
-- 涉及营销、广告投放、内容生成、SEO、客户洞察、Martech → 营销AI(marketing)
-- 如果一条新闻同时涉及两个维度，按主要内容归类
+## 任务1：四象限分类 + 过滤
+对每条新闻做两步判断：
+第一步：是否与AI相关？（AI技术、大模型、LLM、机器学习、深度学习、NLP、CV、智能推荐、AIGC、AI Agent、自动化、生成式AI等）
+- 如果与AI无关 → 归入 skip，不要放入任何象限
+第二步：如果与AI相关，分入四个象限之一：
+- domestic_ai: 国内AI产业（中国公司/机构的AI技术、大模型、芯片、AI政策、AI融资、AI基础设施）
+- domestic_marketing: 国内营销AI（中国市场，AI技术在营销/广告/内容生成/SEO/客户洞察/Martech领域的应用）
+- international_ai: 国际AI产业（海外公司/机构的AI技术、大模型、芯片、AI政策、AI融资、AI基础设施）
+- international_marketing: 国际营销AI（海外市场，AI技术在营销/广告/内容生成/SEO/客户洞察/Martech领域的应用）
+
+判断示例：
+- "纪梵希推出联名早餐" → skip（与AI无关）
+- "OpenAI发布GPT-5" → international_ai
+- "百度用AI优化广告投放效率提升40%" → domestic_marketing
+- "Google用Gemini重写搜索算法" → international_ai
+- "Salesforce推出Einstein GPT for Marketing" → international_marketing
+- "阿里云通义千问接入电商客服" → domestic_marketing
 
 ## 任务2：生成中文摘要
-为每条新闻写一个简洁的中文摘要（30-60字），突出核心信息。
+为每条保留的新闻写一个简洁的中文摘要（30-60字），突出核心信息。
 
 ## 任务3：生成今日导读
 写一段80-120字的"今日导读"，概括今日新闻的整体趋势和亮点。
