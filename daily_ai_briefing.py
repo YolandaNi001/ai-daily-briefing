@@ -210,10 +210,17 @@ CLASSIFY_PROMPT = """你是一位资深的AI产业+营销AI信息筛选专家。
 ✅ 带有 AI 功能的消费级产品或企业级服务的发布、更新、评测（即使不是纯 AI 产品）
 ✅ AI 人才流动 / AI 实验室动态 / AI 开源社区重要事件
 
-【营销AI专项】（同时涉及"AI"+"营销场景"即保留）
+【营销AI专项】（必须同时满足"AI相关"+"营销场景"，缺一不可）
 ✅ AI广告投放优化 / AI内容生成(文案/图片/视频) / AI SEO / AI客户数据分析 /
    AI用户画像 / AI CRM / AI营销自动化 / AI电商推荐 / AI社媒运营工具 /
    AI客服聊天机器人(营销场景) / 数字人直播带货 / AI销售线索评分
+   AIGC营销素材生成平台 / AI舆情监控 / AI竞品分析
+
+⚠️⚠️⚠️ 以下情况绝对不算营销AI，请归入AI产业或skip：
+❌ 手机/汽车/家电/可穿戴设备等消费电子产品发布（即使宣传AI功能，本质是硬件产品）
+❌ 出行/物流/金融/医疗等行业的普通战略合作（除非明确涉及AI营销工具应用）
+❌ 硬件厂商的供应链合作（如芯片采购、代工合作等）
+❌ 任何"某公司发布新产品"如果该产品是终端消费品而非B端AI工具/SaaS
 
 【仅在以下情况 skip】⚠️ 极少使用，慎用！
 ❌ 与 AI/科技完全无关的内容（如纯娱乐八卦、纯体育赛事、纯时尚、纯美食，
@@ -406,7 +413,7 @@ def merge_results(news_list: list[dict], llm_result: dict) -> dict:
 
         return result
 
-    return {
+    merged = {
         "overview": llm_result.get("overview", ""),
         "mode": llm_result.get("mode", "normal"),
         "domestic_ai": fill("domestic_ai"),
@@ -414,6 +421,65 @@ def merge_results(news_list: list[dict], llm_result: dict) -> dict:
         "international_ai": fill("international_ai"),
         "international_marketing": fill("international_marketing"),
     }
+
+    # 代码层硬过滤：兜底纠正DeepSeek对营销AI的误判
+    merged = hard_filter_marketing_ai(merged)
+
+    return merged
+
+
+def hard_filter_marketing_ai(result: dict) -> dict:
+    """硬编码规则：从营销AI象限中移除明显不匹配的新闻，移入AI产业或丢弃"""
+
+    # 营销AI黑名单关键词（标题含这些词 → 不是营销AI）
+    marketing_blacklist = [
+        "手机发布", "新品发布", "系列发布", "新品上市",
+        "汽车发布", "车型发布", "车系发布",
+        "家电", "可穿戴", "耳机", "手表", "平板", "笔记本",
+        "出行合作", "战略合作", "达成合作", "签署协议",
+        "融资完成", "Pre-A轮", "A轮", "B轮", "天使轮",
+        "工厂动工", "产能规划", "供应链",
+        "Reno", "iPhone", "iPad", "MacBook", "Tesla",
+    ]
+
+    # 营销AI白名单关键词（标题含这些词 → 确实是营销AI）
+    marketing_whitelist = [
+        "广告", "投放", "SEO", "搜索优化", "文案", "内容生成",
+        "营销自动化", "CRM", "客户数据", "用户画像", "推荐算法",
+        "舆情", "竞品", "直播带货", "销售线索", "转化率",
+        "AIGC素材", "邮件营销", "社媒运营", "DAM", "CDP",
+        "MarTech", "programmatic", "DSP", "SSP",
+    ]
+
+    def is_real_marketing_ai(title: str, summary: str) -> bool:
+        text = (title + " " + summary).lower()
+        # 白名单命中 → 一定是营销AI
+        if any(kw.lower() in text for kw in marketing_whitelist):
+            return True
+        # 黑名单命中且白名单都不中 → 不是营销AI
+        if any(kw in title for kw in marketing_blacklist):
+            return False
+        # 都不命中 → 保留DeepSeek的判断（不二次干预）
+        return True
+
+    moved_count = 0
+    for mkt_key in ["domestic_marketing", "international_marketing"]:
+        ai_key = mkt_key.replace("_marketing", "_ai")
+        keep = []
+        for item in result[mkt_key]:
+            if is_real_marketing_ai(item["title"], item.get("summary_cn", "")):
+                keep.append(item)
+            else:
+                # 移到对应AI产业象限（如果确实跟AI相关）或直接丢弃
+                item["level"] = item.get("level", "C")  # 降级为C级
+                result[ai_key].append(item)
+                moved_count += 1
+        result[mkt_key] = keep
+
+    if moved_count > 0:
+        log.info(f"  🔧 硬过滤: 从营销AI移出 {moved_count} 条非营销新闻到AI产业")
+
+    return result
 
 
 # ============================================================
