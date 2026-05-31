@@ -208,8 +208,21 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
 对每条新闻做两步判断：
 
 第一步：是否与AI直接相关？
-- AI相关关键词：大模型、LLM、GPT、ChatGPT、Claude、Gemini、通义千问、文心一言、机器学习、深度学习、NLP、CV、AIGC、AI Agent、生成式AI、智能推荐算法、自动化决策、神经网络、训练/推理/微调、Prompt Engineering等
-- 如果与AI无关 → 归入 skip，不要放入任何象限
+采用开放式判断标准——只要新闻核心主题涉及以下任何一个领域，就算与AI相关：
+
+【AI基础技术】机器学习、深度学习、NLP自然语言处理、CV计算机视觉、语音识别/合成、神经网络、强化学习、知识图谱
+
+【大模型与生成式AI】LLM/GPT/Claude/Gemini/DeepSeek/通义千问/文心一言/Kimi/豆包/Mistral/Llama、多模态模型（文本/图像/音频/视频生成）、Sora/Midjourney/DALL-E/Suno等生成工具、AIGC内容生成、Prompt提示工程、Chain-of-Thought思维链、RAG检索增强生成、Function Calling函数调用、Tool Use工具调用、Long Context长上下文
+
+【AI应用形态】AI Agent智能体/自主代理、Copilot助手类产品、数字人/虚拟人/Avatar、具身智能Embodied AI、自动驾驶Autonomous Driving、机器人Robotics、端侧AI/Edge AI/On-device AI、AI编程Cursor/Devin/Windsurf、AI搜索Perplexity/SearchGPT、AI办公Notion AI/Gamma、AI客服/聊天机器人、智能推荐系统
+
+【AI基础设施】算力Compute/GPU/TPU/NPU、推理芯片、向量数据库Vector DB、MLOps/LLMOps、数据标注Data Labeling、合成数据Synthetic Data、云计算AI服务、API平台即服务
+
+【AI安全与治理】AI Safety、AI Alignment对齐、AI Ethics伦理、AI Regulation法规、Deepfake检测、内容审核AI、隐私保护
+
+【AI商业化】AI SaaS产品、AI API服务、AI融资/并购/估值、AI开源项目、AI芯片/半导体
+
+如果新闻完全与上述领域无关 → 归入 skip
 
 第二步：如果与AI相关，分入四个象限之一：
 
@@ -222,17 +235,28 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
 
 - international_marketing: 国际营销AI（同上严格标准，针对海外市场）
 
-判断示例：
+判断示例（涵盖各类AI场景）：
 - "纪梵希推出联名早餐" → skip（与AI无关）
-- "OPPO Reno16发布，主打AI智慧体验" → domestic_ai（产品带AI功能，本质是消费电子产品，不是营销AI工具）
+- "OPPO Reno16发布，主打AI智慧体验" → domestic_ai（消费电子产品带AI功能）
 - "OpenAI发布GPT-5" → international_ai
-- "百度用大模型优化搜索广告CTR提升40%" → domestic_marketing（AI用于广告投放优化）
+- "DeepSeek-R1推理模型登顶排行榜" → international_ai
+- "Sora 2.0支持生成2分钟视频" → international_ai（AIGC/多模态）
+- "Midjourney v7发布" → international_ai（图像AIGC工具）
+- "Cursor用AI帮程序员写代码效率翻倍" → international_ai（AI编程工具）
+- "Perplexity挑战Google搜索" → international_ai（AI搜索产品）
+- "人形机器人Figure 2发布" → international_ai（具身智能/机器人）
+- "英伟达发布B200芯片" → international_ai（AI芯片/算力）
+- "PPIO入选全球AI100" → domestic_ai
+- "比亚迪自研4nm AI芯片" → domestic_ai
+- "苹果WWDC展示端侧AI能力" → international_ai
+- "百度用大模型优化搜索广告CTR提升40%" → domestic_marketing（AI用于广告投放）
 - "Salesforce推出Einstein GPT for Marketing Cloud" → international_marketing（AI营销SaaS平台）
 - "Google AI Overview改变SEO策略" → international_marketing（AI影响搜索营销）
 - "Jasper AI融资5000万，帮助企业批量生成营销文案" → international_marketing（AI文案生成=营销AI）
 - "阿里妈妈推出万相台AI创意工具" → domestic_marketing（AI广告创意=营销AI）
-- "比亚迪自研4nm AI芯片" → domestic_ai（AI芯片=AI产业）
-- "苹果WWDC展示端侧AI能力" → international_ai（AI技术发布）
+- "字节跳动用AI大模型做短视频推荐" → domestic_marketing（AI推荐算法=营销AI）
+- "数字人直播带货月销破千万" → domestic_marketing（数字人=AI营销应用）
+- "某品牌用AI客服替代80%人工客服" → domestic_marketing（AI客服=营销AI应用）
 
 ## 任务2：生成中文摘要
 为每条保留的新闻写一个简洁的中文摘要（30-60字），突出核心信息。
