@@ -512,8 +512,9 @@ def format_briefing_text(result: dict, target_date: datetime) -> str:
         for i, n in enumerate(items, 1):
             summary = n.get("summary_cn", "")
             level = n.get("level", "B")
-            level_tag = "🔥 " if level == "S" else ""
-            lines.append(f"{i}. [{level_tag}]{n['title']}".strip())
+            level_tag = "🔥" if level == "S" else ""
+            title_prefix = f"{level_tag} " if level_tag else ""
+            lines.append(f"{i}. {title_prefix}{n['title']}")
             if summary:
                 lines.append(f"   📝 {summary}")
             lines.append(f"   🔗 {n['url']}")
