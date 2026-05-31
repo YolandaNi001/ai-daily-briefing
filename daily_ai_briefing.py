@@ -72,7 +72,6 @@ QUOTA_CONFIG = {
 RSS_FEEDS = {
     # ===== 国内 · AI产业 =====
     "量子位":   "https://www.qbitai.com/feed",
-    "机器之心": "https://www.jiqizhixin.com/rss",
 
     # ===== 国内 · 营销AI / 科技 =====
     "36氪 AI":  "https://36kr.com/feed?tagId=人工智能",
@@ -83,9 +82,7 @@ RSS_FEEDS = {
     "MIT Tech Review": "https://www.technologyreview.com/feed/",
 
     # ===== 国际 · 营销AI =====
-    "Adweek AI":              "https://www.adweek.com/category/artificial-intelligence/feed/",
-    "Marketing AI Institute": "https://marketingaiinstitute.com/feed/",
-    "SearchEngineJournal":    "https://www.searchenginejournal.com/feed/",
+    "SearchEngineJournal": "https://www.searchenginejournal.com/feed/",
 }
 
 # ============================================================
@@ -187,45 +184,64 @@ def deduplicate_news(entries: list[dict], sent_cache: set) -> list[dict]:
 CLASSIFY_PROMPT = """你是一位资深的AI产业+营销AI信息筛选专家。请对以下新闻列表执行四步分析。
 
 ═══════════════════════════════════════
-第一步：AI相关性过滤（严格）
+第一步：AI相关性判定（宽松保留原则）
 ═══════════════════════════════════════
 
-只有当新闻核心主题直接涉及以下领域时才保留，否则标记为 skip：
+【核心原则】宁可多留，不要漏掉！边界模糊一律保留！
 
-【必须保留 — AI相关】
-• 基础技术: ML/DL/NLP/CV/语音/神经网络/强化学习/知识图谱
-• 大模型与生成式AI: LLM/GPT/Claude/Gemini/DeepSeek/通义千问/文心一言/Kimi/豆包/Mistral/Llama/
-  多模态(AIGC)/Sora/Midjourney/DALL-E/Suno/Prompt工程/RAG/Function Calling/Agent
-• 产品与应用: AI Agent/Copilot/数字人/具身智能/自动驾驶/机器人/端侧AI/
-  AI编程(Cursor/Devin)/AI搜索(Perplexity)/AI办公/AI客服/智能推荐
-• 基础设施: GPU/TPU/NPU/推理芯片/向量数据库/MLOps/数据标注/合成数据/云计算AI
-• 安全与治理: Safety/Alignment/Ethics/Regulation/Deepfake检测/隐私保护
-• 商业化: SaaS/API服务/融资并购估值/开源项目/半导体
+来源先验可信度（重要！）：
+- 量子位、机器之心、36氪 是国内 AI/科技垂直媒体，它们发布的新闻默认与 AI 产业相关，
+  除非内容明显是纯非科技类（如纯娱乐、纯体育），否则一律保留。
+- TechCrunch AI、The Verge AI、MIT Tech Review、Adweek、Marketing AI Institute、SEJ
+  均为 AI/科技/营销垂直源，同样适用宽松保留原则。
 
-【营销AI专项保留】（同时满足"AI相关"+"营销场景"）
+【保留标准 — 满足以下任意一条即保留】
+✅ 明确涉及 AI/ML/DL/NLP/CV/语音/神经网络/强化学习/知识图谱技术本身
+✅ 涉及大模型与生成式AI: LLM/GPT/Claude/Gemini/DeepSeek/通义千问/文心一言/Kimi/豆包/
+   Mistral/Llama/多模态(AIGC)/Sora/Midjourney/DALL-E/Suno/Prompt工程/RAG/Function Calling/Agent
+✅ 涉及 AI 产品与应用: AI Agent/Copilot/数字人/具身智能/自动驾驶/机器人/端侧AI/
+   AI编程(Cursor/Devin)/AI搜索(Perplexity)/AI办公/AI客服/智能推荐
+✅ 涉及 AI 基础设施: GPU/TPU/NPU/推理芯片/向量数据库/MLOps/数据标注/合成数据/云计算AI
+✅ 涉及 AI 安全治理: Safety/Alignment/Ethics/Regulation/Deepfake检测/隐私保护/AI法规政策
+✅ 涉及 AI 商业化: SaaS/API服务/融资并购估值/开源项目/半导体/算力租赁
+✅ 国内 AI 公司（百度/阿里/字节/腾讯/华为/商汤/旷视/云从/科大讯飞/智谱/月之暗面/
+   MiniMax/百川/零一万物等）的产品发布、融资、人事、战略调整、技术进展
+✅ 海外 AI 公司（OpenAI/Anthropic/Google/Meta/xAI/Microsoft/NVIDIA 等）的相关动态
+✅ 带有 AI 功能的消费级产品或企业级服务的发布、更新、评测（即使不是纯 AI 产品）
+✅ AI 人才流动 / AI 实验室动态 / AI 开源社区重要事件
+
+【营销AI专项】（同时涉及"AI"+"营销场景"即保留）
 ✅ AI广告投放优化 / AI内容生成(文案/图片/视频) / AI SEO / AI客户数据分析 /
    AI用户画像 / AI CRM / AI营销自动化 / AI电商推荐 / AI社媒运营工具 /
    AI客服聊天机器人(营销场景) / 数字人直播带货 / AI销售线索评分
 
-【必须skip】
-❌ 纯品牌联名/新品发布会(即使提到AI功能作为卖点，除非核心就是AI产品)
-❌ 纯硬件评测/电商促销/普通行业资讯(未涉及AI技术应用)
-⚠️ 边界案例原则：宁可多留一条可疑的，不要漏掉一条重要的
+【仅在以下情况 skip】⚠️ 极少使用，慎用！
+❌ 与 AI/科技完全无关的内容（如纯娱乐八卦、纯体育赛事、纯时尚、纯美食，
+   且标题和摘要中不包含任何 AI/智能/算法/模型 关键词）
+❌ 纯金融股市行情播报（未提及任何 AI 公司或 AI 技术）
+
+【边界案例处理规则 — 最高优先级】
+⚠️⚠️⚠️ 当你犹豫是否要 skip 时，选择保留！
+⚠️⚠️⚠️ 当一条新闻同时涉及 AI 和其他领域时，保留并归入最接近的象限！
+⚠️⚠️⚠️ 来自垂直 AI 媒体源的新闻，默认保留，除非 100% 确定 与 AI 无关！
+⚠️⚠️⚠️ 即使是"某公司发布新产品"，只要产品带 AI 功能，就保留！
+⚠️⚠️⚠️ 即使是"某公司融资/人事/价格调整"，只要该公司是 AI 公司，就保留！
 
 ═══════════════════════════════════════
 第二步：四象限分类
 ═══════════════════════════════════════
 
 • domestic_ai         → 国内·AI产业（中国主体：大模型/芯片/基础设施/政策/融资/研究/开源）
-• domestic_marketing  → 国内·营销AI（中国主体的AI+营销应用，见上方"营销AI专项保留"标准）
+• domestic_marketing  → 国内·营销AI（中国主体的AI+营销应用，见上方"营销AI专项"标准）
 • international_ai    → 国际·AI产业（海外主体，标准同domestic_ai）
 • international_marketing → 国际·营销AI（海外主体的AI+营销应用）
 
-来源辅助参考（非绝对依据，以内容为准）：
-- 国内源: 量子位、机器之心、36氪 → 倾向 domestic_*
-- 国际源: TechCrunch、The Verge → 倾向 international_ai
-- 营销源: Adweek、Marketing AI Institute、SEJ → 倾向 *_marketing
+【来源优先判定 — 强信号】
+- 量子位、机器之心、36氪 → 95%+ 概率归入 domestic_* 象限
+- TechCrunch AI、The Verge AI → 倾向 international_ai
+- Adweek、Marketing AI Institute、SEJ → 倾向 international_marketing
 - MIT Tech Review → 内容混合，需逐条判断
+- 判定逻辑：先看内容主题，再看来源归属；两者冲突时以内容为准，但来源是重要参考依据
 
 ═══════════════════════════════════════
 第三步：重要性分级（核心！）
@@ -322,7 +338,7 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
                 {"role": "system", "content": "你是专业的AI产业分析师。请严格按JSON格式输出，不要添加markdown代码块标记。"},
                 {"role": "user", "content": CLASSIFY_PROMPT.format(news_json=news_json)},
             ],
-            temperature=0.3,
+            temperature=0.5,
             max_tokens=4096,
         )
         raw = resp.choices[0].message.content.strip()
@@ -646,8 +662,8 @@ def main():
         log.warning("  无新增新闻，退出")
         return
 
-    if len(unique_news) > 40:
-        unique_news = unique_news[:40]
+    if len(unique_news) > 60:
+        unique_news = unique_news[:60]
 
     log.info("Step 3/5: DeepSeek 分类+分级+摘要...")
     result = classify_and_summarize(unique_news)
