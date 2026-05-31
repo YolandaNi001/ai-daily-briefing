@@ -208,26 +208,37 @@ def classify_and_summarize(news_list: list[dict]) -> dict:
     prompt = f"""你是一位专业的AI产业分析师。请分析以下新闻列表，完成三个任务。
 
 ## ⚠️ 核心原则：本简报只收录与AI技术直接相关的新闻
-- 如果一条新闻是关于营销/广告/品牌活动，但完全没有提到AI、机器学习、大模型、自动化、智能推荐等技术，则该新闻不属于本简报范围
-- "营销AI"类别 = AI技术在营销领域的应用，不是所有营销新闻都算
+- 如果一条新闻是关于营销/广告/品牌活动/产品发布，但完全没有提到AI、机器学习、大模型、自动化、智能推荐等技术，则该新闻不属于本简报范围
 
-## 任务1：四象限分类 + 过滤
+## 任务1：四象限分类 + 严格过滤
 对每条新闻做两步判断：
-第一步：是否与AI相关？（AI技术、大模型、LLM、机器学习、深度学习、NLP、CV、智能推荐、AIGC、AI Agent、自动化、生成式AI等）
+
+第一步：是否与AI直接相关？
+- AI相关关键词：大模型、LLM、GPT、ChatGPT、Claude、Gemini、通义千问、文心一言、机器学习、深度学习、NLP、CV、AIGC、AI Agent、生成式AI、智能推荐算法、自动化决策、神经网络、训练/推理/微调、Prompt Engineering等
 - 如果与AI无关 → 归入 skip，不要放入任何象限
+
 第二步：如果与AI相关，分入四个象限之一：
-- domestic_ai: 国内AI产业（中国公司/机构的AI技术、大模型、芯片、AI政策、AI融资、AI基础设施）
-- domestic_marketing: 国内营销AI（中国市场，AI技术在营销/广告/内容生成/SEO/客户洞察/Martech领域的应用）
-- international_ai: 国际AI产业（海外公司/机构的AI技术、大模型、芯片、AI政策、AI融资、AI基础设施）
-- international_marketing: 国际营销AI（海外市场，AI技术在营销/广告/内容生成/SEO/客户洞察/Martech领域的应用）
+
+- domestic_ai: 国内AI产业（中国公司/机构的AI技术研发：大模型发布/升级、AI芯片、AI基础设施、AI政策法规、AI融资、AI开源项目、AI研究突破）
+- international_ai: 国际AI产业（海外公司/机构的AI技术研发：同上标准）
+
+- domestic_marketing: 国内营销AI（严格定义！必须同时满足以下条件）
+  ✅ 算：AI广告投放优化/AI内容生成工具/AI文案写作/AI SEO/AI客户数据分析/AI用户画像/AI CRM/AI营销自动化平台/AI电商推荐引擎/AI社交媒体运营工具
+  ❌ 不算：手机/汽车/家电等产品发布会（即使宣传中提到"AI功能"）、硬件产品评测、品牌联名活动、普通电商促销活动
+
+- international_marketing: 国际营销AI（同上严格标准，针对海外市场）
 
 判断示例：
 - "纪梵希推出联名早餐" → skip（与AI无关）
+- "OPPO Reno16发布，主打AI智慧体验" → domestic_ai（产品带AI功能，本质是消费电子产品，不是营销AI工具）
 - "OpenAI发布GPT-5" → international_ai
-- "百度用AI优化广告投放效率提升40%" → domestic_marketing
-- "Google用Gemini重写搜索算法" → international_ai
-- "Salesforce推出Einstein GPT for Marketing" → international_marketing
-- "阿里云通义千问接入电商客服" → domestic_marketing
+- "百度用大模型优化搜索广告CTR提升40%" → domestic_marketing（AI用于广告投放优化）
+- "Salesforce推出Einstein GPT for Marketing Cloud" → international_marketing（AI营销SaaS平台）
+- "Google AI Overview改变SEO策略" → international_marketing（AI影响搜索营销）
+- "Jasper AI融资5000万，帮助企业批量生成营销文案" → international_marketing（AI文案生成=营销AI）
+- "阿里妈妈推出万相台AI创意工具" → domestic_marketing（AI广告创意=营销AI）
+- "比亚迪自研4nm AI芯片" → domestic_ai（AI芯片=AI产业）
+- "苹果WWDC展示端侧AI能力" → international_ai（AI技术发布）
 
 ## 任务2：生成中文摘要
 为每条保留的新闻写一个简洁的中文摘要（30-60字），突出核心信息。
