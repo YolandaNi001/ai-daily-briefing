@@ -1,0 +1,31 @@
+name: AI产业+营销AI 每日新闻简报
+
+on:
+  schedule:
+    # 北京时间每天9:00 = UTC 1:00
+    - cron: "0 1 * * *"
+  workflow_dispatch:
+
+jobs:
+  daily-briefing:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install openai requests feedparser python-dotenv
+
+      - name: Run daily briefing
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          PUSHPLUS_TOKEN: ${{ secrets.PUSHPLUS_TOKEN }}
+          TZ: Asia/Shanghai
+        run: python daily_ai_briefing.py

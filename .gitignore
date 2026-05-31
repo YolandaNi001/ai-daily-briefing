@@ -1,0 +1,5 @@
+# AI产业+营销AI 每日新闻简报
+.env
+.briefing_cache/
+__pycache__/
+*.pyc
